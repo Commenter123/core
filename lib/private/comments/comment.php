@@ -278,7 +278,7 @@ class Comment implements IComment {
 	 * @return IComment
 	 * @since 9.0.0
 	 */
-	public function setLatestChildDateTime(\DateTime $dateTime) {
+	public function setLatestChildDateTime(\DateTime $dateTime = null) {
 		$this->data['latestChildDT'] = $dateTime;
 		return $this;
 	}

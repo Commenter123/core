@@ -2,6 +2,11 @@
 
 use OCP\Comments\ICommentsManager;
 
+/**
+ * Class Test_Comments_Manager
+ *
+ * @group DB
+ */
 class Test_Comments_Manager extends Test\TestCase
 {
 
@@ -20,24 +25,23 @@ class Test_Comments_Manager extends Test\TestCase
 			$latestChildDT = new \DateTime('yesterday');
 		}
 
-		$sql = '
-			INSERT INTO `*PREFIX*comments`
-			(
-				parent_id, topmost_parent_id, children_count,
-				actor_type, actor_id, message, verb, object_type, object_id,
-				creation_timestamp, latest_child_timestamp
-			)
-			VALUES
-			(
-				"' . $parentId . '", "' . $topmostParentId . '", "2",
-				"user", "alice", "nice one", "comment", "file", "file64",
-				?, ?
-			)
-		';
-		$stmt = \oc::$server->getDatabaseConnection()->prepare($sql);
-		$stmt->bindValue(1, $creationDT, 'datetime');
-		$stmt->bindValue(2, $latestChildDT, 'datetime');
-		$stmt->execute();
+		$qb = \oc::$server->getDatabaseConnection()->getQueryBuilder();
+		$qb
+			->insert('comments')
+			->values([
+					'parent_id'					=> $qb->createNamedParameter($parentId),
+					'topmost_parent_id' 		=> $qb->createNamedParameter($topmostParentId),
+					'children_count' 			=> $qb->createNamedParameter(2),
+					'actor_type' 				=> $qb->createNamedParameter('user'),
+					'actor_id' 					=> $qb->createNamedParameter('alice'),
+					'message' 					=> $qb->createNamedParameter('nice one'),
+					'verb' 						=> $qb->createNamedParameter('comment'),
+					'creation_timestamp' 		=> $qb->createNamedParameter($creationDT, 'datetime'),
+					'latest_child_timestamp'	=> $qb->createNamedParameter($latestChildDT, 'datetime'),
+					'object_type' 				=> $qb->createNamedParameter('file'),
+					'object_id' 				=> $qb->createNamedParameter('file64'),
+			])
+			->execute();
 
 		return \oc::$server->getDatabaseConnection()->lastInsertId('comments');
 	}
@@ -65,28 +69,29 @@ class Test_Comments_Manager extends Test\TestCase
 		$creationDT = new \DateTime();
 		$latestChildDT = new \DateTime('yesterday');
 
-		$sql = '
-			INSERT INTO `*PREFIX*comments`
-			(
-				id, parent_id, topmost_parent_id, children_count,
-				actor_type, actor_id, message, verb, object_type, object_id,
-				creation_timestamp, latest_child_timestamp
-			)
-			VALUES
-			(
-				"3", "2", "1", "2",
-				"user", "alice", "nice one", "comment", "file", "file64",
-				?, ?
-			)
-		';
-		$stmt = \oc::$server->getDatabaseConnection()->prepare($sql);
-		$stmt->bindValue(1, $creationDT, 'datetime');
-		$stmt->bindValue(2, $latestChildDT, 'datetime');
-		$stmt->execute();
+		$qb = \oc::$server->getDatabaseConnection()->getQueryBuilder();
+		$qb
+			->insert('comments')
+			->values([
+					'parent_id'					=> $qb->createNamedParameter('2'),
+					'topmost_parent_id' 		=> $qb->createNamedParameter('1'),
+					'children_count' 			=> $qb->createNamedParameter(2),
+					'actor_type' 				=> $qb->createNamedParameter('user'),
+					'actor_id' 					=> $qb->createNamedParameter('alice'),
+					'message' 					=> $qb->createNamedParameter('nice one'),
+					'verb' 						=> $qb->createNamedParameter('comment'),
+					'creation_timestamp' 		=> $qb->createNamedParameter($creationDT, 'datetime'),
+					'latest_child_timestamp'	=> $qb->createNamedParameter($latestChildDT, 'datetime'),
+					'object_type' 				=> $qb->createNamedParameter('file'),
+					'object_id' 				=> $qb->createNamedParameter('file64'),
+			])
+			->execute();
 
-		$comment = $manager->get('3');
+		$id = strval(\oc::$server->getDatabaseConnection()->lastInsertId('comments'));
+
+		$comment = $manager->get($id);
 		$this->assertTrue($comment instanceof \OCP\Comments\IComment);
-		$this->assertSame($comment->getId(), '3');
+		$this->assertSame($comment->getId(), $id);
 		$this->assertSame($comment->getParentId(), '2');
 		$this->assertSame($comment->getTopmostParentId(), '1');
 		$this->assertSame($comment->getChildrenCount(), 2);
@@ -326,7 +331,7 @@ class Test_Comments_Manager extends Test\TestCase
 		$done = $manager->delete('');
 		$this->assertFalse($done);
 
-		$id = $this->addDatabaseEntry(0, 0);
+		$id = strval($this->addDatabaseEntry(0, 0));
 		$comment = $manager->get($id);
 		$this->assertTrue($comment instanceof \OCP\Comments\IComment);
 		$done = $this->getManager()->delete($id);

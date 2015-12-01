@@ -2,26 +2,33 @@
 
 namespace OC\Comments;
 
+use Doctrine\DBAL\Exception\DriverException;
 use OC\Hooks\Emitter;
 use OCP\Comments\IComment;
 use OCP\Comments\ICommentsManager;
 use OCP\Comments\NotFoundException;
 use OCP\IDBConnection;
+use OCP\ILogger;
 
 class Manager implements ICommentsManager {
 
 	/** @var  IDBConnection */
 	protected $dbConn;
 
+	/** @var  ILogger */
+	protected $logger;
+
 	/** @var array list of files being deleted. key is path, value is ID */
 	protected $deleteList = [];
 
 	public function __construct(
-			IDBConnection $dbConn,
-			Emitter $userManager,
-			Emitter $rootFolder
+		IDBConnection $dbConn,
+		Emitter $userManager,
+		Emitter $rootFolder,
+		ILogger $logger
 	) {
 		$this->dbConn = $dbConn;
+		$this->logger = $logger;
 		$userManager->listen('\OC\User', 'postDelete', function($user) {
 			/** @var \OCP\IUser $user */
 			$this->deleteReferencesOfActor('user', $user->getUid());
@@ -48,6 +55,9 @@ class Manager implements ICommentsManager {
 	 * @return array
 	 */
 	protected function normalizeDatabaseData(array $data) {
+		$data['id'] = strval($data['id']);
+		$data['parent_id'] = strval($data['parent_id']);
+		$data['topmost_parent_id'] = strval($data['topmost_parent_id']);
 		$data['creation_timestamp'] = new \DateTime($data['creation_timestamp']);
 		$data['latest_child_timestamp'] = new \DateTime($data['latest_child_timestamp']);
 		$data['children_count'] = intval($data['children_count']);
@@ -74,7 +84,8 @@ class Manager implements ICommentsManager {
 
 		if($comment->getId() === '') {
 			$comment->setChildrenCount(0);
-			$comment->setLatestChildDateTime(new \DateTime('0000-00-00 00:00', new \DateTimeZone('UTC')));
+			$comment->setLatestChildDateTime(new \DateTime('0000-00-00 00:00:00', new \DateTimeZone('UTC')));
+			$comment->setLatestChildDateTime(null);
 		}
 
 		if(is_null($comment->getCreationDateTime())) {
@@ -159,8 +170,7 @@ class Manager implements ICommentsManager {
 	 * @since 9.0.0
 	 */
 	public function get($id) {
-		$id = intval($id);
-		if($id === 0) {
+		if(intval($id) === 0) {
 			throw new \InvalidArgumentException('IDs must be translatable to a number in this implementation.');
 		}
 
@@ -168,7 +178,7 @@ class Manager implements ICommentsManager {
 		$resultStatement = $qb->select('*')
 			->from('comments')
 			->where($qb->expr()->eq('id', $qb->createParameter('id')))
-			->setParameter('id', $id)
+			->setParameter('id', $id, \PDO::PARAM_INT)
 			->execute();
 
 		$data = $resultStatement->fetch();
@@ -367,7 +377,12 @@ class Manager implements ICommentsManager {
 			->where($qb->expr()->eq('id', $qb->createParameter('id')))
 			->setParameter('id', $id);
 
-		$affectedRows = $query->execute();
+		try {
+			$affectedRows = $query->execute();
+		} catch (DriverException $e) {
+			$this->logger->logException($e, ['app' => 'core_comments']);
+			return false;
+		}
 		return ($affectedRows > 0);
 	}
 
@@ -431,7 +446,7 @@ class Manager implements ICommentsManager {
 			->execute();
 
 		if ($affectedRows > 0) {
-			$comment->setId($this->dbConn->lastInsertId('comments'));
+			$comment->setId(strval($this->dbConn->lastInsertId('comments')));
 		}
 
 		return $affectedRows > 0;
