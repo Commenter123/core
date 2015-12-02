@@ -43,7 +43,7 @@ class Test_Comments_Manager extends Test\TestCase
 			])
 			->execute();
 
-		return \oc::$server->getDatabaseConnection()->lastInsertId('comments');
+		return \oc::$server->getDatabaseConnection()->lastInsertId('*PREFIX*comments');
 	}
 
 	protected function getManager() {
@@ -87,7 +87,7 @@ class Test_Comments_Manager extends Test\TestCase
 			])
 			->execute();
 
-		$id = strval(\oc::$server->getDatabaseConnection()->lastInsertId('comments'));
+		$id = strval(\oc::$server->getDatabaseConnection()->lastInsertId('*PREFIX*comments'));
 
 		$comment = $manager->get($id);
 		$this->assertTrue($comment instanceof \OCP\Comments\IComment);

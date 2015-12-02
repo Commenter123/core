@@ -446,7 +446,7 @@ class Manager implements ICommentsManager {
 			->execute();
 
 		if ($affectedRows > 0) {
-			$comment->setId(strval($this->dbConn->lastInsertId('comments')));
+			$comment->setId(strval($this->dbConn->lastInsertId('*PREFIX*comments')));
 		}
 
 		return $affectedRows > 0;
