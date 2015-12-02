@@ -544,45 +544,6 @@ class Test_Comments_Manager extends Test\TestCase
 		$this->assertTrue($wasSuccessful);
 	}
 
-	public function testDeleteCommentsAtObjectWithFile() {
-		$user = \oc::$server->getUserManager()->createUser('xenia', '123456');
-		$this->assertTrue($user instanceof \OCP\IUser);
-
-		$userFolder = \oc::$server->getUserFolder($user->getUID());
-		$file = $userFolder->newFile('shoppinglist.txt');
-		$fileId =  strval($file->getId());
-
-		$manager = $this->getManager();
-		$comment = $manager->create('user', $user->getUID(), 'file', $fileId);
-		$comment
-				->setMessage('Remember the toothpaste.')
-				->setVerb('comment');
-		$status = $manager->save($comment);
-		$user->delete();
-		$this->assertTrue($status);
-
-		$commentId = $comment->getId();
-
-		$comments = $manager->getForObject('file', $fileId);
-		$this->assertTrue(count($comments) === 1);
-		$this->assertSame($comments[0]->getObjectId(), $fileId);
-		$this->assertSame($comments[0]->getId(), $commentId);
-
-		$file->delete();
-
-		$isDeleted = false;
-		try {
-			$manager->get($commentId);
-		} catch (\OCP\Comments\NotFoundException $e) {
-			$isDeleted = true;
-		}
-		$this->assertTrue($isDeleted);
-
-		$comments = $manager->getForObject('file', $fileId);
-		$this->assertTrue(count($comments) === 0);
-
-	}
-
 	public function testOverwriteDefaultManager() {
 		$config = \oc::$server->getConfig();
 		$defaultManagerFactory = $config->getSystemValue('comments.managerFactory', '\OC\Comments\ManagerFactory');
