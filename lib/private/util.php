@@ -150,6 +150,16 @@ class OC_Util {
 			return $storage;
 		});
 
+		\OC\Files\Filesystem::addStorageWrapper('enable_sharing', function ($mountPoint, \OCP\Files\Storage $storage, \OCP\Files\Mount\IMountPoint $mount) {
+			if (!$mount->getOption('enable_sharing', true)) {
+				return new \OC\Files\Storage\Wrapper\PermissionsMask([
+					'storage' => $storage,
+					'mask' => \OCP\Constants::PERMISSION_ALL - \OCP\Constants::PERMISSION_SHARE
+				]);
+			}
+			return $storage;
+		});
+
 		// install storage availability wrapper, before most other wrappers
 		\OC\Files\Filesystem::addStorageWrapper('oc_availability', function ($mountPoint, $storage) {
 			if (!$storage->isLocal()) {
@@ -408,16 +418,16 @@ class OC_Util {
 			$session->set('OC_VersionString', $OC_VersionString);
 			/** @var $OC_Build string */
 			$session->set('OC_Build', $OC_Build);
-			
+
 			// Allow overriding update channel
-			
+
 			if (\OC::$server->getSystemConfig()->getValue('installed', false)) {
 				$channel = \OC::$server->getAppConfig()->getValue('core', 'OC_Channel');
 			} else {
 				/** @var $OC_Channel string */
 				$channel = $OC_Channel;
 			}
-			
+
 			if (!is_null($channel)) {
 				$session->set('OC_Channel', $channel);
 			} else {
@@ -497,7 +507,7 @@ class OC_Util {
 	 *
 	 * @param string $application application id
 	 * @param string $languageCode language code, defaults to the current language
-	 * @param bool $prepend prepend the Script to the beginning of the list 
+	 * @param bool $prepend prepend the Script to the beginning of the list
 	 */
 	public static function addTranslations($application, $languageCode = null, $prepend = false) {
 		if (is_null($languageCode)) {
@@ -534,7 +544,7 @@ class OC_Util {
 				array_unshift ( self::$styles, $path );
 			} else {
 				self::$styles[] = $path;
-			}	
+			}
 		}
 	}
 
@@ -554,7 +564,7 @@ class OC_Util {
 				array_unshift ( self::$styles, $path );
 			} else {
 				self::$styles[] = $path;
-			}	
+			}
 		}
 	}
 
