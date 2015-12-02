@@ -13,6 +13,8 @@ use OC\Files\Mount\MountPoint;
 use OC\Files\Storage\Temporary;
 use OCP\Files\FileInfo;
 use OCP\Lock\ILockingProvider;
+use Test\Traits\MountProviderTrait;
+use Test\Traits\UserTrait;
 
 class TemporaryNoTouch extends \OC\Files\Storage\Temporary {
 	public function touch($path, $mtime = null) {
@@ -48,6 +50,9 @@ class TemporaryNoLocal extends \OC\Files\Storage\Temporary {
  * @package Test\Files
  */
 class View extends \Test\TestCase {
+	use UserTrait;
+	use MountProviderTrait;
+
 	/**
 	 * @var \OC\Files\Storage\Storage[] $storages
 	 */
@@ -75,14 +80,16 @@ class View extends \Test\TestCase {
 		parent::setUp();
 		\OC_Hook::clear();
 
-		\OC_User::clearBackends();
-		\OC_User::useBackend(new \Test\Util\User\Dummy());
+		$this->createUser('test', 'test');
+
+		$storage = new Temporary();
+		$this->registerMount('test', $storage, '/test');
 
 		//login
 		$userManager = \OC::$server->getUserManager();
 		$groupManager = \OC::$server->getGroupManager();
 		$this->user = 'test';
-		$this->userObject = $userManager->createUser('test', 'test');
+		$this->userObject = $userManager->get('test');
 
 		$this->groupObject = $groupManager->createGroup('group1');
 		$this->groupObject->addUser($this->userObject);
@@ -2388,5 +2395,40 @@ class View extends \Test\TestCase {
 		//Delete the mountpoint
 		$view = new \OC\Files\View('/' . $this->user . '/files');
 		$this->assertEquals('foo', $view->rmdir('mount'));
+	}
+
+	public function mimeFilterProvider() {
+		return [
+			[null, ['test1.txt', 'test2.txt', 'test3.md', 'test4.png']],
+			['text/plain', ['test1.txt', 'test2.txt']],
+			['text/markdown', ['test3.md']],
+			['text', ['test1.txt', 'test2.txt', 'test3.md']],
+		];
+	}
+
+	/**
+	 * @param string $filter
+	 * @param string[] $expected
+	 * @dataProvider mimeFilterProvider
+	 */
+	public function testGetDirectoryContentMimeFilter($filter, $expected) {
+		$storage1 = new Temporary();
+		$root = $this->getUniqueID('/');
+		\OC\Files\Filesystem::mount($storage1, array(), $root . '/');
+		$view = new \OC\Files\View($root);
+
+		$view->file_put_contents('test1.txt', 'asd');
+		$view->file_put_contents('test2.txt', 'asd');
+		$view->file_put_contents('test3.md', 'asd');
+		$view->file_put_contents('test4.png', '');
+
+		$content = $view->getDirectoryContent('', $filter);
+
+		$files = array_map(function(FileInfo $info) {
+			return $info->getName();
+		}, $content);
+		sort($files);
+
+		$this->assertEquals($expected, $files);
 	}
 }
