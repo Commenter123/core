@@ -334,10 +334,10 @@ class Test_Comments_Manager extends Test\TestCase
 		$id = strval($this->addDatabaseEntry(0, 0));
 		$comment = $manager->get($id);
 		$this->assertTrue($comment instanceof \OCP\Comments\IComment);
-		$done = $this->getManager()->delete($id);
+		$done = $manager->delete($id);
 		$this->assertTrue($done);
 		$this->setExpectedException('\OCP\Comments\NotFoundException');
-		$manager->get('1');
+		$manager->get($id);
 	}
 
 	public function testSaveNew() {

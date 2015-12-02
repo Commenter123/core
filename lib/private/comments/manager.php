@@ -18,6 +18,9 @@ class Manager implements ICommentsManager {
 	/** @var  ILogger */
 	protected $logger;
 
+	/** @var IComment[]  */
+	protected $commentsCache = [];
+
 	public function __construct(
 		IDBConnection $dbConn,
 		Emitter $userManager,
@@ -82,6 +85,8 @@ class Manager implements ICommentsManager {
 			$comment->setTopmostParentId('0');
 		}
 
+		$this->cache($comment);
+
 		return $comment;
 	}
 
@@ -145,6 +150,31 @@ class Manager implements ICommentsManager {
 	}
 
 	/**
+	 * run-time caches a comment
+	 *
+	 * @param IComment $comment
+	 */
+	protected function cache(IComment $comment) {
+		$id = $comment->getId();
+		if(empty($id)) {
+			return;
+		}
+		$this->commentsCache[strval($id)] = $comment;
+	}
+
+	/**
+	 * removes an entry from the comments run time cache
+	 *
+	 * @param mixed $id the comment's id
+	 */
+	protected function uncache($id) {
+		$id = strval($id);
+		if (isset($this->commentsCache[$id])) {
+			unset($this->commentsCache[$id]);
+		}
+	}
+
+	/**
 	 * returns a comment instance
 	 *
 	 * @param string $id the ID of the comment
@@ -156,6 +186,10 @@ class Manager implements ICommentsManager {
 	public function get($id) {
 		if(intval($id) === 0) {
 			throw new \InvalidArgumentException('IDs must be translatable to a number in this implementation.');
+		}
+
+		if(isset($this->commentsCache[$id])) {
+			return $this->commentsCache[$id];
 		}
 
 		$qb = $this->dbConn->getQueryBuilder();
@@ -171,7 +205,9 @@ class Manager implements ICommentsManager {
 			throw new NotFoundException();
 		}
 
-		return new Comment($this->normalizeDatabaseData($data));
+		$comment = new Comment($this->normalizeDatabaseData($data));
+		$this->cache($comment);
+		return $comment;
 	}
 
 	/**
@@ -224,8 +260,10 @@ class Manager implements ICommentsManager {
 
 		$resultStatement = $query->execute();
 		while($data = $resultStatement->fetch()) {
+			$comment = new Comment($this->normalizeDatabaseData($data));
+			$this->cache($comment);
 			$tree['replies'][] = [
-				'comment' => new Comment($this->normalizeDatabaseData($data)),
+				'comment' => $comment,
 				'replies' => []
 			];
 		}
@@ -281,7 +319,9 @@ class Manager implements ICommentsManager {
 
 		$resultStatement = $query->execute();
 		while($data = $resultStatement->fetch()) {
-			$comments[] = new Comment($this->normalizeDatabaseData($data));
+			$comment = new Comment($this->normalizeDatabaseData($data));
+			$this->cache($comment);
+			$comments[] = $comment;
 		}
 		$resultStatement->closeCursor();
 
@@ -363,6 +403,7 @@ class Manager implements ICommentsManager {
 
 		try {
 			$affectedRows = $query->execute();
+			$this->uncache($id);
 		} catch (DriverException $e) {
 			$this->logger->logException($e, ['app' => 'core_comments']);
 			return false;
@@ -399,6 +440,7 @@ class Manager implements ICommentsManager {
 					$comment->getParentId(),
 					$comment->getCreationDateTime()
 			);
+			$this->cache($comment);
 		}
 
 		return $result;
@@ -492,6 +534,8 @@ class Manager implements ICommentsManager {
 			->setParameter('id', $actorId)
 			->execute();
 
+		$this->commentsCache = [];
+
 		return is_int($affectedRows);
 	}
 
@@ -514,6 +558,8 @@ class Manager implements ICommentsManager {
 			->setParameter('type', $objectType)
 			->setParameter('id', $objectId)
 			->execute();
+
+		$this->commentsCache = [];
 
 		return is_int($affectedRows);
 	}
